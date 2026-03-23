@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rat Colony Viewer</title>
+<title>Rat Overflow Mischief Viewer</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -66,6 +66,38 @@
   .upload-area label:hover { background: #c73a52; }
 
   #fileInput { display: none; }
+
+  .save-hint {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    opacity: 0.7;
+    text-align: center;
+  }
+
+  .save-hint code {
+    background: rgba(255,255,255,0.08);
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.82rem;
+  }
+
+  footer {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    margin-top: 2rem;
+    border-top: 1px solid var(--card-border);
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  footer a:hover {
+    text-decoration: underline;
+  }
 
   .meta-bar {
     display: flex;
@@ -310,7 +342,7 @@
 <body>
 
 <header>
-  <h1>Rat <span>Colony</span> Viewer</h1>
+  <h1>Rat <span>Overflow</span> Mischief Viewer</h1>
   <p class="subtitle">Load a save file to view your rats' stats</p>
 </header>
 
@@ -318,9 +350,14 @@
   <label for="fileInput">Load Save File (.json)</label>
   <input type="file" id="fileInput" accept=".json">
   <span class="subtitle" id="fileName">No file loaded</span>
+  <span class="subtitle save-hint" id="saveHint">Save files are usually found in<br><code>%AppData%\Roaming\rat-overflow\saves</code></span>
 </div>
 
 <div id="app"></div>
+
+<footer>
+  <a href="https://store.steampowered.com/app/4435150/Rat_Overflow/" target="_blank" rel="noopener">Support Rat Overflow on Steam!</a>
+</footer>
 
 <script>
 const VISIBLE_STATS = ['friendliness','weight','head','bone','bodyShape','coatQuality','eyes'];
@@ -342,6 +379,7 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
   document.getElementById('fileName').textContent = file.name;
+  document.getElementById('saveHint').style.display = 'none';
   const reader = new FileReader();
   reader.onload = (ev) => {
     try {
