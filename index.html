@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rat Colony Viewer</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card-bg: #16213e;
+    --card-border: #0f3460;
+    --text: #e0e0e0;
+    --text-dim: #8a8a9a;
+    --accent: #e94560;
+    --accent2: #533483;
+    --male: #5dadec;
+    --female: #f2a2c0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    padding: 2rem 1rem 1rem;
+    background: linear-gradient(135deg, var(--card-bg), var(--accent2));
+    border-bottom: 2px solid var(--card-border);
+  }
+
+  header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.3rem;
+    letter-spacing: 1px;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .subtitle { color: var(--text-dim); font-size: 0.95rem; }
+
+  .upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 2rem;
+  }
+
+  .upload-area label {
+    display: inline-block;
+    padding: 0.7rem 2rem;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: background 0.2s;
+  }
+
+  .upload-area label:hover { background: #c73a52; }
+
+  #fileInput { display: none; }
+
+  .meta-bar {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    padding: 0.8rem 1rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--card-border);
+    font-size: 0.9rem;
+  }
+
+  .meta-bar .meta-item {
+    color: var(--text-dim);
+  }
+
+  .meta-bar .meta-item strong {
+    color: var(--text);
+  }
+
+  .section-title {
+    font-size: 1.2rem;
+    padding: 1.2rem 1.5rem 0.5rem;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--card-border);
+    margin: 0 1rem;
+  }
+
+  .section-title .count { color: var(--accent); }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .controls select, .controls input {
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+
+  .controls input { width: 200px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1rem;
+    padding: 1rem 1.5rem 2rem;
+  }
+
+  .rat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .rat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+
+  .rat-card.male { border-top: 3px solid var(--male); }
+  .rat-card.female { border-top: 3px solid var(--female); }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.8rem 1rem 0.4rem;
+  }
+
+  .rat-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .rat-name .fav { color: gold; margin-left: 4px; }
+
+  .sex-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .sex-badge.male { background: rgba(93,173,236,0.2); color: var(--male); }
+  .sex-badge.female { background: rgba(242,162,192,0.2); color: var(--female); }
+
+  .card-info {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0 1rem 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .card-info .tag {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .card-info .health-good { color: #4ade80; }
+  .card-info .health-bad { color: var(--accent); }
+
+  .stats {
+    padding: 0.4rem 1rem 0.8rem;
+  }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+    gap: 6px;
+  }
+
+  .stat-label {
+    width: 85px;
+    font-size: 0.75rem;
+    text-align: right;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .stat-bar-bg {
+    flex: 1;
+    height: 14px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+  }
+
+  .stat-value {
+    width: 28px;
+    font-size: 0.75rem;
+    text-align: right;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Pokemon-style stat colors */
+  .stat-friendliness .stat-bar-fill { background: linear-gradient(90deg, #f472b6, #ec4899); }
+  .stat-weight .stat-bar-fill      { background: linear-gradient(90deg, #fb923c, #f97316); }
+  .stat-head .stat-bar-fill         { background: linear-gradient(90deg, #60a5fa, #3b82f6); }
+  .stat-bone .stat-bar-fill         { background: linear-gradient(90deg, #a78bfa, #8b5cf6); }
+  .stat-bodyShape .stat-bar-fill    { background: linear-gradient(90deg, #34d399, #10b981); }
+  .stat-coatQuality .stat-bar-fill  { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+  .stat-eyes .stat-bar-fill         { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+
+  .stat-total {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  .stat-total .stat-bar-fill {
+    background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  }
+
+  .champion-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, gold, #c9880e);
+    color: #1a1a2e;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 3px;
+    margin-left: 6px;
+  }
+
+  .card-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 0 1rem 0.6rem;
+  }
+
+  .card-tags .user-tag {
+    background: rgba(233,69,96,0.2);
+    color: var(--accent);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 1rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; padding: 0.5rem; }
+    header h1 { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rat <span>Colony</span> Viewer</h1>
+  <p class="subtitle">Load a save file to view your rats' stats</p>
+</header>
+
+<div class="upload-area">
+  <label for="fileInput">Load Save File (.json)</label>
+  <input type="file" id="fileInput" accept=".json">
+  <span class="subtitle" id="fileName">No file loaded</span>
+</div>
+
+<div id="app"></div>
+
+<script>
+const VISIBLE_STATS = ['friendliness','weight','head','bone','bodyShape','coatQuality','eyes'];
+
+const STAT_LABELS = {
+  friendliness: 'Friendliness',
+  weight: 'Weight',
+  head: 'Head',
+  bone: 'Bone',
+  bodyShape: 'Body Shape',
+  coatQuality: 'Coat Quality',
+  eyes: 'Eyes'
+};
+
+const MAX_STAT = 100;
+const MAX_TOTAL = VISIBLE_STATS.length * MAX_STAT;
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      renderAll(data);
+    } catch (err) {
+      document.getElementById('app').innerHTML =
+        `<div class="empty-state">Failed to parse JSON: ${err.message}</div>`;
+    }
+  };
+  reader.readAsText(file);
+});
+
+function renderAll(data) {
+  const gd = data.gameData;
+  const app = document.getElementById('app');
+
+  const ownedRats = gd.rats || [];
+  const archivedRats = gd.archivedRats || [];
+
+  // Collect shop rats
+  const shopGroups = [];
+  if (gd.breederShops) {
+    for (const [key, shop] of Object.entries(gd.breederShops)) {
+      if (shop.rats && shop.rats.length > 0) {
+        const shopName = shop.rats[0]?.breeder || key;
+        shopGroups.push({ name: shopName, rats: shop.rats });
+      }
+    }
+  }
+
+  let html = '';
+
+  // Meta bar
+  html += `<div class="meta-bar">
+    <span class="meta-item"><strong>${gd.playerName || '???'}</strong></span>
+    <span class="meta-item">Day <strong>${gd.currentDay}</strong></span>
+    <span class="meta-item">Level <strong>${gd.level || 1}</strong></span>
+    <span class="meta-item">Money <strong>$${gd.money}</strong></span>
+    <span class="meta-item">Speed <strong>${gd.gameSpeed || '?'}</strong></span>
+  </div>`;
+
+  // Legend
+  html += `<div class="legend">`;
+  for (const stat of VISIBLE_STATS) {
+    html += `<span class="legend-item">
+      <span class="legend-swatch stat-${stat}"></span>
+      ${STAT_LABELS[stat]}
+    </span>`;
+  }
+  html += `</div>`;
+
+  // Controls
+  html += `<div class="controls">
+    <input type="text" id="searchInput" placeholder="Search by name or color...">
+    <select id="sortSelect">
+      <option value="name">Sort: Name</option>
+      <option value="age">Sort: Age</option>
+      <option value="total">Sort: Total Stats</option>
+      ${VISIBLE_STATS.map(s => `<option value="${s}">Sort: ${STAT_LABELS[s]}</option>`).join('')}
+    </select>
+    <select id="sortDir">
+      <option value="desc">Descending</option>
+      <option value="asc">Ascending</option>
+    </select>
+  </div>`;
+
+  // Sections
+  html += renderSection('Your Rats', ownedRats, 'owned');
+
+  if (archivedRats.length > 0) {
+    html += renderSection('Archived Rats', archivedRats, 'archived');
+  }
+
+  for (const group of shopGroups) {
+    html += renderSection(`Shop: ${group.name}`, group.rats, 'shop');
+  }
+
+  if (ownedRats.length === 0 && archivedRats.length === 0 && shopGroups.length === 0) {
+    html += `<div class="empty-state">No rats found in this save file.</div>`;
+  }
+
+  app.innerHTML = html;
+
+  // Style legend swatches
+  document.querySelectorAll('.legend-swatch').forEach(el => {
+    const stat = el.className.replace('legend-swatch ', '');
+    const tempDiv = document.createElement('div');
+    tempDiv.className = `stat-row ${stat}`;
+    tempDiv.innerHTML = '<div class="stat-bar-bg"><div class="stat-bar-fill"></div></div>';
+    document.body.appendChild(tempDiv);
+    const fill = tempDiv.querySelector('.stat-bar-fill');
+    const bg = getComputedStyle(fill).background || getComputedStyle(fill).backgroundColor;
+    el.style.background = bg;
+    document.body.removeChild(tempDiv);
+  });
+
+  // Wire up controls
+  const searchInput = document.getElementById('searchInput');
+  const sortSelect = document.getElementById('sortSelect');
+  const sortDir = document.getElementById('sortDir');
+
+  function applyFilters() {
+    const query = searchInput.value.toLowerCase();
+    const sortBy = sortSelect.value;
+    const dir = sortDir.value;
+
+    document.querySelectorAll('.grid').forEach(grid => {
+      const cards = Array.from(grid.children);
+
+      cards.forEach(card => {
+        const name = card.dataset.name || '';
+        const color = card.dataset.color || '';
+        const match = name.includes(query) || color.includes(query);
+        card.style.display = match ? '' : 'none';
+      });
+
+      const visible = cards.filter(c => c.style.display !== 'none');
+      visible.sort((a, b) => {
+        let va, vb;
+        if (sortBy === 'name') {
+          va = a.dataset.name; vb = b.dataset.name;
+          return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        } else if (sortBy === 'age') {
+          va = +a.dataset.age; vb = +b.dataset.age;
+        } else if (sortBy === 'total') {
+          va = +a.dataset.total; vb = +b.dataset.total;
+        } else {
+          va = +(a.dataset['stat_' + sortBy] || 0);
+          vb = +(b.dataset['stat_' + sortBy] || 0);
+        }
+        return dir === 'asc' ? va - vb : vb - va;
+      });
+
+      visible.forEach(card => grid.appendChild(card));
+    });
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+  sortSelect.addEventListener('change', applyFilters);
+  sortDir.addEventListener('change', applyFilters);
+}
+
+function renderSection(title, rats, sectionId) {
+  let html = `<div class="section-title">${title} <span class="count">(${rats.length})</span></div>`;
+  html += `<div class="grid" id="grid-${sectionId}">`;
+  for (const rat of rats) {
+    html += renderRatCard(rat);
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderRatCard(rat) {
+  const p = rat.phenotype || {};
+  const total = VISIBLE_STATS.reduce((sum, s) => sum + (p[s] || 0), 0);
+
+  const dataAttrs = VISIBLE_STATS.map(s => `data-stat_${s}="${p[s] || 0}"`).join(' ');
+
+  let html = `<div class="rat-card ${rat.sex}"
+    data-name="${(rat.name || '').toLowerCase()}"
+    data-color="${(rat.colorDisplayName || '').toLowerCase()}"
+    data-age="${rat.age || 0}"
+    data-total="${total}"
+    ${dataAttrs}>`;
+
+  // Header
+  html += `<div class="card-header">
+    <span class="rat-name">${esc(rat.name || 'Unnamed')}`;
+  if (rat.isFavorite) html += `<span class="fav">&#9733;</span>`;
+  if (rat.isChampion) html += `<span class="champion-badge">CHAMP T${rat.championTier || 0}</span>`;
+  html += `</span>
+    <span class="sex-badge ${rat.sex}">${rat.sex === 'male' ? '\u2642 Male' : '\u2640 Female'}</span>
+  </div>`;
+
+  // Info tags
+  html += `<div class="card-info">`;
+  html += `<span class="tag">Age ${rat.age}</span>`;
+  html += `<span class="tag">Gen ${rat.generation}</span>`;
+  if (rat.colorDisplayName) html += `<span class="tag">${esc(rat.colorDisplayName)}</span>`;
+  const healthClass = rat.healthStatus === 'healthy' ? 'health-good' : 'health-bad';
+  html += `<span class="tag ${healthClass}">${rat.hp}hp ${esc(rat.healthStatus || '')}</span>`;
+  if (rat.isPregnant) html += `<span class="tag" style="color:#f472b6">Pregnant</span>`;
+  if (rat.isRetired) html += `<span class="tag" style="color:#fbbf24">Retired</span>`;
+  if (rat.breeder) html += `<span class="tag">From: ${esc(rat.breeder)}</span>`;
+  html += `</div>`;
+
+  // User tags
+  if (rat.tags && rat.tags.length > 0) {
+    html += `<div class="card-tags">`;
+    for (const tag of rat.tags) {
+      html += `<span class="user-tag">${esc(tag)}</span>`;
+    }
+    html += `</div>`;
+  }
+
+  // Stats
+  html += `<div class="stats">`;
+  for (const stat of VISIBLE_STATS) {
+    const val = p[stat] || 0;
+    const pct = Math.min(100, (val / MAX_STAT) * 100);
+    html += `<div class="stat-row stat-${stat}">
+      <span class="stat-label">${STAT_LABELS[stat]}</span>
+      <div class="stat-bar-bg">
+        <div class="stat-bar-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="stat-value">${val}</span>
+    </div>`;
+  }
+
+  // Total
+  const totalPct = Math.min(100, (total / MAX_TOTAL) * 100);
+  html += `<div class="stat-row stat-total">
+    <span class="stat-label" style="font-weight:700">Total</span>
+    <div class="stat-bar-bg">
+      <div class="stat-bar-fill" style="width:${totalPct}%"></div>
+    </div>
+    <span class="stat-value" style="font-weight:700">${total}</span>
+  </div>`;
+
+  html += `</div></div>`;
+  return html;
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
