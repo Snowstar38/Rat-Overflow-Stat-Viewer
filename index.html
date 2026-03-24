@@ -379,11 +379,11 @@
 </footer>
 
 <script>
-const VISIBLE_STATS = ['friendliness','weight','head','bone','bodyShape','coatQuality','eyes'];
+const VISIBLE_STATS = ['friendliness','head','bone','bodyShape','coatQuality','eyes'];
 
 const STAT_LABELS = {
   friendliness: 'Friendliness',
-  weight: 'Weight',
+
   head: 'Head',
   bone: 'Bone',
   bodyShape: 'Body Shape',
@@ -396,7 +396,7 @@ const MAX_STAT = 100;
 // Stats where higher = better (closer to 100)
 const HIGH_IS_BEST = new Set(['friendliness', 'coatQuality', 'eyes']);
 // Stats where a middle range is best
-const MID_RANGE_STATS = new Set(['weight', 'head', 'bone', 'bodyShape']);
+const MID_RANGE_STATS = new Set(['head', 'bone', 'bodyShape']);
 const GOOD_RANGE = [38, 58];
 const IDEAL_RANGE = [46, 50];
 
