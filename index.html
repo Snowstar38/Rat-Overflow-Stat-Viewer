@@ -259,6 +259,35 @@
     flex-shrink: 0;
   }
 
+  .stat-value.rating-ideal { color: #4ade80; }
+  .stat-value.rating-good { color: #a3e635; }
+  .stat-value.rating-ok { color: var(--text); }
+
+  /* Optimal range markers on bars */
+  .stat-bar-bg {
+    position: relative;
+  }
+
+  .range-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid rgba(255,255,255,0.18);
+    border-right: 1px solid rgba(255,255,255,0.18);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .range-marker.good-range {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .range-marker.ideal-range {
+    background: rgba(74,222,128,0.10);
+    border-left: 1px dashed rgba(74,222,128,0.35);
+    border-right: 1px dashed rgba(74,222,128,0.35);
+  }
+
   /* Pokemon-style stat colors */
   .stat-friendliness .stat-bar-fill { background: linear-gradient(90deg, #f472b6, #ec4899); }
   .stat-weight .stat-bar-fill      { background: linear-gradient(90deg, #fb923c, #f97316); }
@@ -364,6 +393,55 @@ const STAT_LABELS = {
 
 const MAX_STAT = 100;
 
+// Stats where higher = better (closer to 100)
+const HIGH_IS_BEST = new Set(['friendliness', 'coatQuality', 'eyes']);
+// Stats where a middle range is best
+const MID_RANGE_STATS = new Set(['weight', 'head', 'bone', 'bodyShape']);
+const GOOD_RANGE = [40, 60];
+const IDEAL_RANGE = [45, 55];
+
+// Per-stat good/ideal thresholds for high-is-best stats (>= threshold)
+const HIGH_THRESHOLDS = {
+  friendliness: { good: 75, ideal: 90 },
+  coatQuality:  { good: 60, ideal: 80 },
+  eyes:         { good: 60, ideal: 80 }
+};
+
+function getStatRating(stat, val) {
+  if (HIGH_IS_BEST.has(stat)) {
+    const t = HIGH_THRESHOLDS[stat];
+    if (val >= t.ideal) return 'ideal';
+    if (val >= t.good) return 'good';
+    return 'ok';
+  }
+  if (MID_RANGE_STATS.has(stat)) {
+    if (val >= IDEAL_RANGE[0] && val <= IDEAL_RANGE[1]) return 'ideal';
+    if (val >= GOOD_RANGE[0] && val <= GOOD_RANGE[1]) return 'good';
+    return 'ok';
+  }
+  return 'ok';
+}
+
+function calcScore(phenotype) {
+  let score = 0;
+  for (const stat of VISIBLE_STATS) {
+    const rating = getStatRating(stat, phenotype[stat] || 0);
+    if (rating === 'ideal') score += 2;
+    else if (rating === 'good') score += 1;
+  }
+  return score;
+}
+
+function renderRangeMarkers(stat) {
+  if (!MID_RANGE_STATS.has(stat)) return '';
+  const goodL = (GOOD_RANGE[0] / MAX_STAT) * 100;
+  const goodW = ((GOOD_RANGE[1] - GOOD_RANGE[0]) / MAX_STAT) * 100;
+  const idealL = (IDEAL_RANGE[0] / MAX_STAT) * 100;
+  const idealW = ((IDEAL_RANGE[1] - IDEAL_RANGE[0]) / MAX_STAT) * 100;
+  return `<span class="range-marker good-range" style="left:${goodL}%;width:${goodW}%"></span>` +
+         `<span class="range-marker ideal-range" style="left:${idealL}%;width:${idealW}%"></span>`;
+}
+
 document.getElementById('fileInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -421,12 +499,22 @@ function renderAll(data) {
   }
   html += `</div>`;
 
+  // Range legend
+  html += `<div class="legend" style="gap:1.5rem; font-size:0.72rem; opacity:0.7;">
+    <span class="legend-item"><span class="legend-swatch" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18)"></span> Good (40-60)</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:rgba(74,222,128,0.15);border:1px dashed rgba(74,222,128,0.35)"></span> Ideal (45-55)</span>
+    <span style="color:var(--text-dim)">for Weight / Head / Bone / Body Shape</span>
+    <span style="margin-left:0.5rem; color:var(--text-dim)">|</span>
+    <span style="color:var(--text-dim)">Friendliness / Coat / Eyes: higher is better</span>
+  </div>`;
+
   // Controls
   html += `<div class="controls">
     <input type="text" id="searchInput" placeholder="Search by name or color...">
     <select id="sortSelect">
       <option value="name">Sort: Name</option>
       <option value="age">Sort: Age</option>
+      <option value="score">Sort: Score</option>
       ${VISIBLE_STATS.map(s => `<option value="${s}">Sort: ${STAT_LABELS[s]}</option>`).join('')}
     </select>
     <select id="sortDir">
@@ -521,12 +609,15 @@ function renderSection(title, rats, sectionId) {
 
 function renderRatCard(rat) {
   const p = rat.phenotype || {};
+  const score = calcScore(p);
+  const maxScore = VISIBLE_STATS.length * 2; // 14
   const dataAttrs = VISIBLE_STATS.map(s => `data-stat_${s}="${p[s] || 0}"`).join(' ');
 
   let html = `<div class="rat-card ${rat.sex}"
     data-name="${(rat.name || '').toLowerCase()}"
     data-color="${(rat.colorDisplayName || '').toLowerCase()}"
     data-age="${rat.age || 0}"
+    data-stat_score="${score}"
     ${dataAttrs}>`;
 
   // Header
@@ -548,6 +639,8 @@ function renderRatCard(rat) {
   if (rat.isPregnant) html += `<span class="tag" style="color:#f472b6">Pregnant</span>`;
   if (rat.isRetired) html += `<span class="tag" style="color:#fbbf24">Retired</span>`;
   if (rat.breeder) html += `<span class="tag">From: ${esc(rat.breeder)}</span>`;
+  const scoreColor = score >= 12 ? '#4ade80' : score >= 8 ? '#a3e635' : score >= 4 ? '#fbbf24' : 'var(--text-dim)';
+  html += `<span class="tag" style="color:${scoreColor};font-weight:600">Score ${score}/${maxScore}</span>`;
   html += `</div>`;
 
   // User tags
@@ -564,12 +657,14 @@ function renderRatCard(rat) {
   for (const stat of VISIBLE_STATS) {
     const val = p[stat] || 0;
     const pct = Math.min(100, (val / MAX_STAT) * 100);
+    const rating = getStatRating(stat, val);
     html += `<div class="stat-row stat-${stat}">
       <span class="stat-label">${STAT_LABELS[stat]}</span>
       <div class="stat-bar-bg">
+        ${renderRangeMarkers(stat)}
         <div class="stat-bar-fill" style="width:${pct}%"></div>
       </div>
-      <span class="stat-value">${val}</span>
+      <span class="stat-value rating-${rating}">${val}</span>
     </div>`;
   }
 
