@@ -402,7 +402,7 @@ const IDEAL_RANGE = [45, 55];
 
 // Per-stat good/ideal thresholds for high-is-best stats (>= threshold)
 const HIGH_THRESHOLDS = {
-  friendliness: { good: 75, ideal: 90 },
+  friendliness: { good: 60, ideal: 80 },
   coatQuality:  { good: 60, ideal: 80 },
   eyes:         { good: 60, ideal: 80 }
 };
@@ -521,6 +521,11 @@ function renderAll(data) {
       <option value="desc">Descending</option>
       <option value="asc">Ascending</option>
     </select>
+    <select id="ageFilter">
+      <option value="all">All Ages</option>
+      <option value="adult">Adults (6+ weeks)</option>
+      <option value="baby">Babies (&lt;6 weeks)</option>
+    </select>
   </div>`;
 
   // Sections
@@ -557,11 +562,13 @@ function renderAll(data) {
   const searchInput = document.getElementById('searchInput');
   const sortSelect = document.getElementById('sortSelect');
   const sortDir = document.getElementById('sortDir');
+  const ageFilter = document.getElementById('ageFilter');
 
   function applyFilters() {
     const query = searchInput.value.toLowerCase();
     const sortBy = sortSelect.value;
     const dir = sortDir.value;
+    const ageFilt = ageFilter.value;
 
     document.querySelectorAll('.grid').forEach(grid => {
       const cards = Array.from(grid.children);
@@ -569,8 +576,10 @@ function renderAll(data) {
       cards.forEach(card => {
         const name = card.dataset.name || '';
         const color = card.dataset.color || '';
-        const match = name.includes(query) || color.includes(query);
-        card.style.display = match ? '' : 'none';
+        const age = +(card.dataset.age || 0);
+        const textMatch = name.includes(query) || color.includes(query);
+        const ageMatch = ageFilt === 'all' || (ageFilt === 'adult' && age >= 30) || (ageFilt === 'baby' && age < 30);
+        card.style.display = (textMatch && ageMatch) ? '' : 'none';
       });
 
       const visible = cards.filter(c => c.style.display !== 'none');
@@ -595,6 +604,7 @@ function renderAll(data) {
   searchInput.addEventListener('input', applyFilters);
   sortSelect.addEventListener('change', applyFilters);
   sortDir.addEventListener('change', applyFilters);
+  ageFilter.addEventListener('change', applyFilters);
 }
 
 function renderSection(title, rats, sectionId) {
