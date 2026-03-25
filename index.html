@@ -262,6 +262,8 @@
   .stat-value.rating-ideal { color: #4ade80; }
   .stat-value.rating-good { color: #a3e635; }
   .stat-value.rating-ok { color: var(--text); }
+  .stat-value.rating-bad { color: #fb923c; }
+  .stat-value.rating-vbad { color: var(--accent); }
 
   /* Optimal range markers on bars */
   .stat-bar-bg {
@@ -288,14 +290,12 @@
     border-right: 1px dashed rgba(74,222,128,0.35);
   }
 
-  /* Pokemon-style stat colors */
-  .stat-friendliness .stat-bar-fill { background: linear-gradient(90deg, #f472b6, #ec4899); }
-  .stat-weight .stat-bar-fill      { background: linear-gradient(90deg, #fb923c, #f97316); }
-  .stat-head .stat-bar-fill         { background: linear-gradient(90deg, #60a5fa, #3b82f6); }
-  .stat-bone .stat-bar-fill         { background: linear-gradient(90deg, #a78bfa, #8b5cf6); }
-  .stat-bodyShape .stat-bar-fill    { background: linear-gradient(90deg, #34d399, #10b981); }
-  .stat-coatQuality .stat-bar-fill  { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
-  .stat-eyes .stat-bar-fill         { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+  /* Rating-based bar colors */
+  .stat-bar-fill.rating-vbad { background: linear-gradient(90deg, #ef4444, #dc2626); }
+  .stat-bar-fill.rating-bad  { background: linear-gradient(90deg, #fb923c, #f97316); }
+  .stat-bar-fill.rating-ok   { background: linear-gradient(90deg, #fbbf24, #eab308); }
+  .stat-bar-fill.rating-good { background: linear-gradient(90deg, #a3e635, #84cc16); }
+  .stat-bar-fill.rating-ideal { background: linear-gradient(90deg, #34d399, #059669); }
 
   .champion-badge {
     display: inline-block;
@@ -393,51 +393,56 @@ const STAT_LABELS = {
 
 const MAX_STAT = 100;
 
-// Stats where higher = better (closer to 100)
-const HIGH_IS_BEST = new Set(['friendliness', 'coatQuality', 'eyes']);
-// Stats where a middle range is best
-const MID_RANGE_STATS = new Set(['head', 'bone', 'bodyShape']);
-const GOOD_RANGE = [38, 57];
-const IDEAL_RANGE = [46, 50];
-
-// Per-stat good/ideal thresholds for high-is-best stats (>= threshold)
+// Thresholds derived from in-game testing
+// Friendliness: <=19 vbad, 20-39 bad, 40-59 ok, 60-79 good, 80+ ideal
+// Coat/Eyes:    <=20 vbad, 21-40 bad, 41-60 ok, 61-80 good, 81+ ideal
+// Head/Bone/Body (mid-range): <=29 vbad, 30-35 bad, 36-44 good, 45-50 ideal, 51-55 good, 56-70 bad, 71+ vbad
 const HIGH_THRESHOLDS = {
-  friendliness: { good: 60, ideal: 80 },
-  coatQuality:  { good: 61, ideal: 80 },
-  eyes:         { good: 61, ideal: 80 }
+  friendliness: { vbad: 19, bad: 39, ok: 59, good: 79 },
+  coatQuality:  { vbad: 20, bad: 40, ok: 60, good: 80 },
+  eyes:         { vbad: 20, bad: 40, ok: 60, good: 80 }
 };
 
+const MID_RANGE_THRESHOLDS = { vbad: 29, bad: [30, 35], good: [36, 44], ideal: [45, 50], good2: [51, 55], bad2: [56, 70] };
+const MID_RANGE_STATS = new Set(['head', 'bone', 'bodyShape']);
+
 function getStatRating(stat, val) {
-  if (HIGH_IS_BEST.has(stat)) {
+  if (stat in HIGH_THRESHOLDS) {
     const t = HIGH_THRESHOLDS[stat];
-    if (val >= t.ideal) return 'ideal';
-    if (val >= t.good) return 'good';
-    return 'ok';
+    if (val > t.good) return 'ideal';
+    if (val > t.ok) return 'good';
+    if (val > t.bad) return 'ok';
+    if (val > t.vbad) return 'bad';
+    return 'vbad';
   }
   if (MID_RANGE_STATS.has(stat)) {
-    if (val >= IDEAL_RANGE[0] && val <= IDEAL_RANGE[1]) return 'ideal';
-    if (val >= GOOD_RANGE[0] && val <= GOOD_RANGE[1]) return 'good';
-    return 'ok';
+    const t = MID_RANGE_THRESHOLDS;
+    if (val >= t.ideal[0] && val <= t.ideal[1]) return 'ideal';
+    if ((val >= t.good[0] && val <= t.good[1]) || (val >= t.good2[0] && val <= t.good2[1])) return 'good';
+    if ((val >= t.bad[0] && val <= t.bad[1]) || (val >= t.bad2[0] && val <= t.bad2[1])) return 'bad';
+    return 'vbad';
   }
   return 'ok';
 }
 
 function calcScore(phenotype) {
   let score = 0;
+  const points = { ideal: 4, good: 3, ok: 2, bad: 1, vbad: 0 };
   for (const stat of VISIBLE_STATS) {
     const rating = getStatRating(stat, phenotype[stat] || 0);
-    if (rating === 'ideal') score += 2;
-    else if (rating === 'good') score += 1;
+    score += points[rating] || 0;
   }
   return score;
 }
+const MAX_SCORE = VISIBLE_STATS.length * 4;
 
 function renderRangeMarkers(stat) {
   if (!MID_RANGE_STATS.has(stat)) return '';
-  const goodL = (GOOD_RANGE[0] / MAX_STAT) * 100;
-  const goodW = ((GOOD_RANGE[1] - GOOD_RANGE[0]) / MAX_STAT) * 100;
-  const idealL = (IDEAL_RANGE[0] / MAX_STAT) * 100;
-  const idealW = ((IDEAL_RANGE[1] - IDEAL_RANGE[0]) / MAX_STAT) * 100;
+  const t = MID_RANGE_THRESHOLDS;
+  const goodL = (t.good[0] / MAX_STAT) * 100;
+  const goodW = ((t.good2[1] - t.good[0]) / MAX_STAT) * 100;
+  const idealL = (t.ideal[0] / MAX_STAT) * 100;
+  const idealW = ((t.ideal[1] - t.ideal[0]) / MAX_STAT) * 100;
   return `<span class="range-marker good-range" style="left:${goodL}%;width:${goodW}%"></span>` +
          `<span class="range-marker ideal-range" style="left:${idealL}%;width:${idealW}%"></span>`;
 }
@@ -489,21 +494,20 @@ function renderAll(data) {
     <span class="meta-item">Speed <strong>${gd.gameSpeed || '?'}</strong></span>
   </div>`;
 
-  // Legend
-  html += `<div class="legend">`;
-  for (const stat of VISIBLE_STATS) {
-    html += `<span class="legend-item">
-      <span class="legend-swatch stat-${stat}"></span>
-      ${STAT_LABELS[stat]}
-    </span>`;
-  }
-  html += `</div>`;
+  // Rating color legend
+  html += `<div class="legend">
+    <span class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#ef4444,#dc2626)"></span> Very Bad</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#fb923c,#f97316)"></span> Bad</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#fbbf24,#eab308)"></span> Average</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#a3e635,#84cc16)"></span> Good</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#34d399,#059669)"></span> Excellent</span>
+  </div>`;
 
-  // Range legend
+  // Range legend for mid-range stats
   html += `<div class="legend" style="gap:1.5rem; font-size:0.72rem; opacity:0.7;">
-    <span class="legend-item"><span class="legend-swatch" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18)"></span> Good (40-60)</span>
-    <span class="legend-item"><span class="legend-swatch" style="background:rgba(74,222,128,0.15);border:1px dashed rgba(74,222,128,0.35)"></span> Ideal (45-55)</span>
-    <span style="color:var(--text-dim)">for Weight / Head / Bone / Body Shape</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18)"></span> Good (36-55)</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:rgba(74,222,128,0.15);border:1px dashed rgba(74,222,128,0.35)"></span> Excellent (45-50)</span>
+    <span style="color:var(--text-dim)">for Head / Bone / Body Shape</span>
     <span style="margin-left:0.5rem; color:var(--text-dim)">|</span>
     <span style="color:var(--text-dim)">Friendliness / Coat / Eyes: higher is better</span>
   </div>`;
@@ -546,19 +550,6 @@ function renderAll(data) {
 
   app.innerHTML = html;
 
-  // Style legend swatches
-  document.querySelectorAll('.legend-swatch').forEach(el => {
-    const stat = el.className.replace('legend-swatch ', '');
-    const tempDiv = document.createElement('div');
-    tempDiv.className = `stat-row ${stat}`;
-    tempDiv.innerHTML = '<div class="stat-bar-bg"><div class="stat-bar-fill"></div></div>';
-    document.body.appendChild(tempDiv);
-    const fill = tempDiv.querySelector('.stat-bar-fill');
-    const bg = getComputedStyle(fill).background || getComputedStyle(fill).backgroundColor;
-    el.style.background = bg;
-    document.body.removeChild(tempDiv);
-  });
-
   // Wire up controls
   const searchInput = document.getElementById('searchInput');
   const sortSelect = document.getElementById('sortSelect');
@@ -598,8 +589,8 @@ function renderAll(data) {
           } else if (sortBy === 'age') {
             va = +a.dataset.age; vb = +b.dataset.age;
           } else {
-            va = +(a.dataset['stat_' + sortBy] || 0);
-            vb = +(b.dataset['stat_' + sortBy] || 0);
+            va = +(a.dataset['stat_' + sortBy.toLowerCase()] || 0);
+            vb = +(b.dataset['stat_' + sortBy.toLowerCase()] || 0);
           }
           return dir === 'asc' ? va - vb : vb - va;
         });
@@ -628,7 +619,6 @@ function renderSection(title, rats, sectionId) {
 function renderRatCard(rat, index) {
   const p = rat.phenotype || {};
   const score = calcScore(p);
-  const maxScore = VISIBLE_STATS.length * 2; // 14
   const dataAttrs = VISIBLE_STATS.map(s => `data-stat_${s}="${p[s] || 0}"`).join(' ');
 
   let html = `<div class="rat-card ${rat.sex}"
@@ -658,8 +648,8 @@ function renderRatCard(rat, index) {
   if (rat.isPregnant) html += `<span class="tag" style="color:#f472b6">Pregnant</span>`;
   if (rat.isRetired) html += `<span class="tag" style="color:#fbbf24">Retired</span>`;
   if (rat.breeder) html += `<span class="tag">From: ${esc(rat.breeder)}</span>`;
-  const scoreColor = score >= 12 ? '#4ade80' : score >= 8 ? '#a3e635' : score >= 4 ? '#fbbf24' : 'var(--text-dim)';
-  html += `<span class="tag" style="color:${scoreColor};font-weight:600">Score ${score}/${maxScore}</span>`;
+  const scoreColor = score >= 22 ? '#4ade80' : score >= 16 ? '#a3e635' : score >= 10 ? '#fbbf24' : score >= 6 ? '#fb923c' : 'var(--accent)';
+  html += `<span class="tag" style="color:${scoreColor};font-weight:600">Score ${score}/${MAX_SCORE}</span>`;
   html += `</div>`;
 
   // User tags
@@ -681,7 +671,7 @@ function renderRatCard(rat, index) {
       <span class="stat-label">${STAT_LABELS[stat]}</span>
       <div class="stat-bar-bg">
         ${renderRangeMarkers(stat)}
-        <div class="stat-bar-fill" style="width:${pct}%"></div>
+        <div class="stat-bar-fill rating-${rating}" style="width:${pct}%"></div>
       </div>
       <span class="stat-value rating-${rating}">${val}</span>
     </div>`;
