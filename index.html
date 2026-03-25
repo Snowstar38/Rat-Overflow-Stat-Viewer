@@ -403,7 +403,8 @@ const HIGH_THRESHOLDS = {
   eyes:         { vbad: 20, bad: 40, ok: 60, good: 80 }
 };
 
-const MID_RANGE_THRESHOLDS = { vbad: 29, bad: [30, 35], good: [36, 44], ideal: [45, 50], good2: [51, 55], bad2: [56, 70] };
+// Head/Bone/Body (mid-range): <=15 vbad, 16-29 bad, 30-35 ok, 36-44 good, 45-50 ideal, 51-55 good, 56-70 ok, 71-85 bad, 86+ vbad
+const MID_RANGE_THRESHOLDS = { vbad1: 15, bad1: [16, 29], ok1: [30, 35], good1: [36, 44], ideal: [45, 50], good2: [51, 55], ok2: [56, 70], bad2: [71, 85] };
 const MID_RANGE_STATS = new Set(['head', 'bone', 'bodyShape']);
 
 function getStatRating(stat, val) {
@@ -418,8 +419,9 @@ function getStatRating(stat, val) {
   if (MID_RANGE_STATS.has(stat)) {
     const t = MID_RANGE_THRESHOLDS;
     if (val >= t.ideal[0] && val <= t.ideal[1]) return 'ideal';
-    if ((val >= t.good[0] && val <= t.good[1]) || (val >= t.good2[0] && val <= t.good2[1])) return 'good';
-    if ((val >= t.bad[0] && val <= t.bad[1]) || (val >= t.bad2[0] && val <= t.bad2[1])) return 'bad';
+    if ((val >= t.good1[0] && val <= t.good1[1]) || (val >= t.good2[0] && val <= t.good2[1])) return 'good';
+    if ((val >= t.ok1[0] && val <= t.ok1[1]) || (val >= t.ok2[0] && val <= t.ok2[1])) return 'ok';
+    if ((val >= t.bad1[0] && val <= t.bad1[1]) || (val >= t.bad2[0] && val <= t.bad2[1])) return 'bad';
     return 'vbad';
   }
   return 'ok';
@@ -427,20 +429,22 @@ function getStatRating(stat, val) {
 
 function calcScore(phenotype) {
   let score = 0;
-  const points = { ideal: 4, good: 3, ok: 2, bad: 1, vbad: 0 };
   for (const stat of VISIBLE_STATS) {
     const rating = getStatRating(stat, phenotype[stat] || 0);
-    score += points[rating] || 0;
+    if (rating === 'ideal') score += 2;
+    else if (rating === 'good') score += 1;
+    else if (rating === 'bad') score -= 1;
+    else if (rating === 'vbad') score -= 2;
   }
   return score;
 }
-const MAX_SCORE = VISIBLE_STATS.length * 4;
+const MAX_SCORE = VISIBLE_STATS.length * 2;
 
 function renderRangeMarkers(stat) {
   if (!MID_RANGE_STATS.has(stat)) return '';
   const t = MID_RANGE_THRESHOLDS;
-  const goodL = (t.good[0] / MAX_STAT) * 100;
-  const goodW = ((t.good2[1] - t.good[0]) / MAX_STAT) * 100;
+  const goodL = (t.good1[0] / MAX_STAT) * 100;
+  const goodW = ((t.good2[1] - t.good1[0]) / MAX_STAT) * 100;
   const idealL = (t.ideal[0] / MAX_STAT) * 100;
   const idealW = ((t.ideal[1] - t.ideal[0]) / MAX_STAT) * 100;
   return `<span class="range-marker good-range" style="left:${goodL}%;width:${goodW}%"></span>` +
@@ -648,7 +652,7 @@ function renderRatCard(rat, index) {
   if (rat.isPregnant) html += `<span class="tag" style="color:#f472b6">Pregnant</span>`;
   if (rat.isRetired) html += `<span class="tag" style="color:#fbbf24">Retired</span>`;
   if (rat.breeder) html += `<span class="tag">From: ${esc(rat.breeder)}</span>`;
-  const scoreColor = score >= 22 ? '#4ade80' : score >= 16 ? '#a3e635' : score >= 10 ? '#fbbf24' : score >= 6 ? '#fb923c' : 'var(--accent)';
+  const scoreColor = score >= 9 ? '#4ade80' : score >= 6 ? '#a3e635' : score >= 3 ? '#fbbf24' : score >= 0 ? '#fb923c' : 'var(--accent)';
   html += `<span class="tag" style="color:${scoreColor};font-weight:600">Score ${score}/${MAX_SCORE}</span>`;
   html += `</div>`;
 
